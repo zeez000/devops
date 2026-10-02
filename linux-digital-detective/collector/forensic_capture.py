@@ -57,7 +57,25 @@ def listening_ports() -> list[dict]:
     return rows
 
 
-def capture(reason: str, metadata: dict | None = None, service: str = "nginx") -> Path:
+def _prune_old_forensics(max_files: int) -> None:
+    files = sorted(
+        FORENSICS_DIR.glob("*.json"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    for old in files[max_files:]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+
+
+def capture(
+    reason: str,
+    metadata: dict | None = None,
+    service: str = "nginx",
+    max_files: int = 100,
+) -> Path:
     now = datetime.now(timezone.utc)
     payload = {
         "timestamp": now.isoformat(),
@@ -84,6 +102,7 @@ def capture(reason: str, metadata: dict | None = None, service: str = "nginx") -
     )
     path = FORENSICS_DIR / f"{stamp}_{safe_reason}.json"
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    _prune_old_forensics(max_files)
     return path
 
 
