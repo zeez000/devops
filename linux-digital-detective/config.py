@@ -25,6 +25,7 @@ class Settings:
     metrics_max_mb: int = _int("LDD_METRICS_MAX_MB", 20)
     incidents_max_mb: int = _int("LDD_INCIDENTS_MAX_MB", 10)
     forensic_cooldown_seconds: int = _int("LDD_FORENSIC_COOLDOWN_SECONDS", 20)
+    forensic_max_files: int = _int("LDD_FORENSIC_MAX_FILES", 100)
     monitored_service: str = os.getenv("LDD_MONITORED_SERVICE", "nginx")
     monitored_port: int = _int("LDD_MONITORED_PORT", 80)
 
