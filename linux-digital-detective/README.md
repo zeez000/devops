@@ -1,34 +1,30 @@
 # Linux Digital Detective
 
-A lightweight Linux observability and incident-forensics lab built for hands-on DevOps/SRE practice.
+A Linux observability and incident-forensics lab built for hands-on DevOps/SRE practice.
 
-The agent continuously records small system metrics. When a threshold is crossed or nginx/port 80 changes state, it creates an incident and captures a detailed forensic snapshot containing top processes, listening ports, recent journal entries, and nginx state.
+It now includes a lightweight monitoring agent, stateful incident detection, on-demand forensic capture, automatic data rotation, a live dashboard, a FastAPI API, Prometheus-compatible metrics, systemd services, CI tests, preflight checks, and controlled incident demos.
 
-## Architecture
+## What it monitors
 
-```text
-Linux host
-   |
-   +-- CPU / memory / disk metrics
-   +-- process state (nginx)
-   +-- network state (port 80)
-   |
-   v
-collector/agent.py
-   |
-   +--> data/metrics.jsonl       lightweight history
-   +--> data/incidents.jsonl     state-change incidents
-   |
-   +-- incident trigger --> collector/forensic_capture.py
-                                |
-                                +--> top processes
-                                +--> listening ports
-                                +--> journalctl
-                                +--> nginx systemd state
-                                +--> data/forensics/*.json
+- CPU, memory, and root-disk usage
+- A configurable systemd service (default: nginx)
+- A configurable TCP port (default: 80)
+- Startup failures as well as runtime state changes
+- Recovery transitions after incidents
 
-FastAPI --> /status /metrics /incidents /forensics
-```
+## Incident evidence
+
+High-resource events and service/port failures can capture:
+
+- hottest processes
+- listening ports
+- recent journal entries
+- service status
+- disk usage
+- memory usage
+- hostname and timestamp
+
+A cooldown prevents duplicate forensic captures during one incident burst, and old forensic snapshots are capped by retention settings.
 
 ## Quick start
 
@@ -36,35 +32,85 @@ FastAPI --> /status /metrics /incidents /forensics
 git clone https://github.com/zeez000/devops.git
 cd devops/linux-digital-detective
 
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-python collector/agent.py
+make install
+make check
 ```
 
-Open a second terminal for the API:
+Terminal 1:
 
 ```bash
-cd ~/devops/linux-digital-detective
-source .venv/bin/activate
-uvicorn api.app:app --host 0.0.0.0 --port 8000
+make agent
 ```
 
-Then open `http://127.0.0.1:8000/docs` in the Ubuntu browser.
+Terminal 2:
 
-## Controlled incident test
+```bash
+make api
+```
+
+Open:
+
+```text
+http://127.0.0.1:8000/dashboard
+```
+
+API docs:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+Prometheus-style metrics:
+
+```text
+http://127.0.0.1:8000/metrics
+```
+
+## Controlled demo
 
 With the agent running:
 
 ```bash
-sudo apt install nginx -y
-sudo systemctl start nginx
-sudo systemctl stop nginx
-sleep 10
-sudo systemctl start nginx
+make demo
 ```
 
-The agent should record `SERVICE_DOWN`, `PORT_DOWN`, `SERVICE_RECOVERED`, and `PORT_RECOVERED`. Down events also trigger forensic snapshots.
+The demo stops nginx briefly and starts it again so you can watch `SERVICE_DOWN`, `PORT_DOWN`, recovery events, and forensic capture appear in the dashboard.
 
-For the complete usage map, thresholds, API routes, and troubleshooting commands, read [GUIDE.md](GUIDE.md).
+## Run permanently with systemd
+
+After `make install`:
+
+```bash
+make systemd
+```
+
+Then check:
+
+```bash
+systemctl status linux-digital-detective-agent
+systemctl status linux-digital-detective-api
+```
+
+## Configuration
+
+Copy values from `.env.example` into your shell environment or service configuration. Important settings include thresholds, polling interval, monitored service/port, JSONL rotation limits, forensic cooldown, and forensic snapshot retention.
+
+## Project map
+
+```text
+linux-digital-detective/
+├── collector/          monitoring + forensic capture
+├── api/                FastAPI API
+├── dashboard/          live browser dashboard
+├── scripts/            preflight, demo, systemd installer
+├── systemd/            service unit templates
+├── tests/              storage tests
+├── data/               runtime files, ignored by Git
+├── config.py           environment-based settings
+├── storage.py          JSONL storage + rotation
+├── Makefile            common commands
+├── README.md
+└── GUIDE.md
+```
+
+For the full usage map, troubleshooting commands, and architecture notes, read [GUIDE.md](GUIDE.md).
