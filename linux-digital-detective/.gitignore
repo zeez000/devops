@@ -1,6 +1,9 @@
 .venv/
 __pycache__/
 *.py[cod]
+.env
 data/*.jsonl
 data/forensics/*.json
+data/archive/
 !data/.gitkeep
+.pytest_cache/
