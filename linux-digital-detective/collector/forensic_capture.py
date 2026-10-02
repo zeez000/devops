@@ -6,14 +6,15 @@ from pathlib import Path
 
 import psutil
 
-DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+ROOT = Path(__file__).resolve().parents[1]
+DATA_DIR = ROOT / "data"
 FORENSICS_DIR = DATA_DIR / "forensics"
 FORENSICS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _run(command):
+def _run(command: list[str], timeout: int = 5) -> dict:
     try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=5)
+        result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
         return {
             "returncode": result.returncode,
             "stdout": result.stdout.splitlines(),
@@ -23,7 +24,7 @@ def _run(command):
         return {"returncode": None, "stdout": [], "stderr": [str(exc)]}
 
 
-def top_processes(limit=15):
+def top_processes(limit: int = 15) -> list[dict]:
     rows = []
     for proc in psutil.process_iter(["pid", "name", "username", "cpu_percent", "memory_percent"]):
         try:
@@ -31,15 +32,20 @@ def top_processes(limit=15):
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
     rows.sort(
-        key=lambda p: (p.get("cpu_percent") or 0, p.get("memory_percent") or 0),
+        key=lambda p: ((p.get("cpu_percent") or 0), (p.get("memory_percent") or 0)),
         reverse=True,
     )
     return rows[:limit]
 
 
-def listening_ports():
+def listening_ports() -> list[dict]:
     rows = []
-    for conn in psutil.net_connections(kind="inet"):
+    try:
+        connections = psutil.net_connections(kind="inet")
+    except psutil.AccessDenied:
+        return rows
+
+    for conn in connections:
         if conn.status != psutil.CONN_LISTEN:
             continue
         rows.append({
@@ -51,7 +57,7 @@ def listening_ports():
     return rows
 
 
-def capture(reason, metadata=None):
+def capture(reason: str, metadata: dict | None = None, service: str = "nginx") -> Path:
     now = datetime.now(timezone.utc)
     payload = {
         "timestamp": now.isoformat(),
@@ -66,8 +72,10 @@ def capture(reason, metadata=None):
         },
         "top_processes": top_processes(),
         "listening_ports": listening_ports(),
-        "nginx": _run(["systemctl", "is-active", "nginx"]),
-        "journal": _run(["journalctl", "-n", "80", "--no-pager", "-o", "short-iso"]),
+        "service_state": _run(["systemctl", "status", service, "--no-pager", "--lines=20"]),
+        "journal": _run(["journalctl", "-n", "100", "--no-pager", "-o", "short-iso"]),
+        "disk": _run(["df", "-h"]),
+        "memory": _run(["free", "-h"]),
     }
 
     stamp = now.strftime("%Y%m%dT%H%M%SZ")
