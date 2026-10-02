@@ -1,0 +1,25 @@
+name: Linux Digital Detective CI
+
+on:
+  push:
+    paths:
+      - 'linux-digital-detective/**'
+      - '.github/workflows/linux-digital-detective-ci.yml'
+  pull_request:
+    paths:
+      - 'linux-digital-detective/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: linux-digital-detective
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python -m py_compile config.py storage.py collector/agent.py collector/forensic_capture.py api/app.py
+      - run: PYTHONPATH=. pytest -q
