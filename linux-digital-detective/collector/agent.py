@@ -77,7 +77,7 @@ class IncidentWriter:
             and time.monotonic() - self._last_forensic_at
             >= settings.forensic_cooldown_seconds
         ):
-            path = capture(kind, payload, settings.monitored_service)
+            path = capture(kind, payload, settings.monitored_service, settings.forensic_max_files)
             payload["forensic_file"] = str(path.relative_to(ROOT))
             self._last_forensic_at = time.monotonic()
 
@@ -104,6 +104,23 @@ def main() -> None:
         f"DISK>={settings.disk_threshold}% | "
         f"service={settings.monitored_service} port={settings.monitored_port}"
     )
+
+    if not states["service_up"]:
+        writer.write(
+            "SERVICE_DOWN",
+            "high",
+            f"{settings.monitored_service} is not running at agent startup",
+            metadata={"service": settings.monitored_service, "startup": True},
+            forensic=True,
+        )
+    if not states["port_up"]:
+        writer.write(
+            "PORT_DOWN",
+            "high",
+            f"Port {settings.monitored_port} is not listening at agent startup",
+            metadata={"port": settings.monitored_port, "startup": True},
+            forensic=True,
+        )
 
     while True:
         loop_started = time.monotonic()
